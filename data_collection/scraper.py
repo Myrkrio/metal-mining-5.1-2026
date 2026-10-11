@@ -6,16 +6,19 @@ Downloads all artists, their albums, and all songs in each album.
 Saves to data/progress{quarter}.json
 
 Supports multi-user scraping with different quarters of the artist list.
-Users: Florent (quarter 1), Nizar (quarter 2), Mathis (quarter 3), Rayen (quarter 4)
+Users: Florent (quarter 1), Nizar (quarter 2), Mathis (quarter 3), Rayen (quarter 4), Yohann
 """
 
 import argparse
 import json
 import os
 import sys
+import re
+import requests
 
 from metalparser.darklyrics import DarkLyricsApi
 
+from scrap_cover import init_selenium_driver, get_metal_archives_cover
 
 def get_user_info(user_name):
 	"""
@@ -25,7 +28,8 @@ def get_user_info(user_name):
 		"Florent": 1,
 		"Nizar": 2,
 		"Mathis": 3,
-		"Rayen": 4
+		"Rayen": 4,
+		"Yohann": 5
 	}
 	
 	if user_name not in user_mapping:
@@ -42,7 +46,7 @@ def split_artists_by_quarter(artists, quarter):
 	Split the artists list into quarters and return the specified quarter.
 	"""
 	total_artists = len(artists)
-	quarter_size = total_artists // 4
+	quarter_size = total_artists // 5
 	
 	# Calculate start and end indices for the quarter
 	if quarter == 1:
@@ -56,6 +60,9 @@ def split_artists_by_quarter(artists, quarter):
 		end_idx = quarter_size * 3
 	elif quarter == 4:
 		start_idx = quarter_size * 3
+		end_idx = total_artists * 4
+	elif quarter == 5:
+		start_idx = quarter_size * 4
 		end_idx = total_artists
 	else:
 		raise ValueError(f"Invalid quarter: {quarter}")
@@ -70,7 +77,7 @@ def get_next_user_boundary(quarter, total_artists):
 	"""
 	Get the starting position of the next user's quarter (the boundary where this user should stop).
 	"""
-	quarter_size = total_artists // 4
+	quarter_size = total_artists // 5
 	
 	if quarter == 1:
 		return quarter_size  # Start of quarter 2
@@ -79,6 +86,8 @@ def get_next_user_boundary(quarter, total_artists):
 	elif quarter == 3:
 		return quarter_size * 3  # Start of quarter 4
 	elif quarter == 4:
+		return quarter_size * 4
+	elif quarter == 5:
 		return total_artists  # End of all artists
 	else:
 		raise ValueError(f"Invalid quarter: {quarter}")
@@ -89,6 +98,12 @@ def fetch_complete_dataset(api, artists, existing_dataset=None, start_position=0
 	Fetch complete dataset: artists, their albums, and all songs.
 	Returns a nested dictionary structure.
 	"""
+	print("Lancement du navigateur...")
+	driver = init_selenium_driver(headless=True)
+
+	covers_dir = "./data/covers"
+	os.makedirs(covers_dir, exist_ok=True)
+
 	complete_dataset = existing_dataset.copy() if existing_dataset else {}
 	total_artists = len(artists) + start_position
 	
@@ -123,10 +138,23 @@ def fetch_complete_dataset(api, artists, existing_dataset=None, start_position=0
 				print(f"    [{j}/{len(albums)}] Processing album: {album_name}")
 				
 				try:
+
+					# ... dans ta boucle de traitement des albums :
+					cover_data = get_metal_archives_cover(driver, artist, album_name)
+
+					if cover_data:
+						filename, mime_type, binary_data = cover_data
+						output_path = f"./data/covers/{artist} - {album_name}.jpg"
+						with open(output_path, "wb") as f:
+							f.write(binary_data)
+						print(f"Cover sauvegardée : {filename}")
+					else:
+						print(f"Échec de la récupération pour {album_name}")
+
+				
 					# Get songs for this album
 					songs_data = api.get_album_info_and_lyrics(album_name, artist, lyrics_only=False) or []
 					print(f"      Found {len(songs_data)} songs")
-					
 					# Get album metadata from first song (all songs in album have same metadata)
 					album_metadata = {
 						"release_year": songs_data[0].get("release_year", "") if songs_data else "",
@@ -137,6 +165,7 @@ def fetch_complete_dataset(api, artists, existing_dataset=None, start_position=0
 						"name": album_name,
 						"release_year": album_metadata["release_year"],
 						"album_type": album_metadata["album_type"],
+						"cover_path": output_path,
 						"songs": []
 					}
 					
@@ -162,7 +191,8 @@ def fetch_complete_dataset(api, artists, existing_dataset=None, start_position=0
 		except Exception as e:
 			print(f"  Error processing artist '{artist}': {e}")
 			continue
-	
+	print("Fermeture du navigateur.")
+	driver.quit()
 	return complete_dataset
 
 
@@ -198,7 +228,7 @@ def save_progress(dataset, current, total, progress_file_name="progress.json"):
 def main():
 	# Parse command line arguments
 	parser = argparse.ArgumentParser(description="Scrape DarkLyrics with multi-user support")
-	parser.add_argument("--user", required=True, choices=["Florent", "Nizar", "Mathis", "Rayen"],
+	parser.add_argument("--user", required=True, choices=["Florent", "Nizar", "Mathis", "Rayen", "Yohann"],
 						help="User name (Florent, Nizar, Mathis, or Rayen)")
 	args = parser.parse_args()
 	
