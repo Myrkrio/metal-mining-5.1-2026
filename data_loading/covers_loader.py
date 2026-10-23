@@ -23,8 +23,6 @@ def get_available_covers(covers_dir: str = 'data/covers') -> Set[str]:
     total_files = len(files)
     
     print(f"[Covers] Files found: {total_files}")
-    if total_files != 14404:
-        print(f"[WARNING] Total differs from the expected 14404 covers (Found: {total_files}).")
 
     # Extract name without extension (e.g., "Artist - Album.jpg" -> "Artist - Album")
     covers_no_ext = {os.path.splitext(f)[0] for f in files}
