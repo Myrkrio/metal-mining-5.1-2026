@@ -43,7 +43,8 @@ def load_music_data(filepath: str = 'data/dataset.json') -> Tuple[pd.DataFrame, 
     includes album type information.
     """
     with open(filepath, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+        content = f.read().replace('\u2028', ' ').replace('\u2029', ' ')
+        data = json.loads(content)
     
     # Handle nested dataset structure
     if 'dataset' in data and 'dataset' in data['dataset']:
@@ -107,7 +108,8 @@ def load_music_data_with_lyrics(filepath: str = 'data/dataset.json') -> pd.DataF
         pd.DataFrame: Processed DataFrame containing song metadata and lyrics.
     """
     with open(filepath, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+        content = f.read().replace('\u2028', ' ').replace('\u2029', ' ')
+        data = json.loads(content)
 
     songs_data = []
 
@@ -151,3 +153,17 @@ def load_music_data_with_lyrics(filepath: str = 'data/dataset.json') -> pd.DataF
 
     df_songs = pd.DataFrame(songs_data)
     return df_songs
+
+def load_genres_data(filepath: str = 'data/bands_genres_cleaned.json'):
+    """
+    Load the cleaned genres mapping for artists.
+    
+    Args:
+        filepath (str): Path to the cleaned genres JSON file.
+        
+    Returns:
+        dict: Mapping of artist names to their list of genres.
+    """
+    with open(filepath, 'r', encoding='utf-8') as f:
+        content = f.read().replace('\u2028', ' ').replace('\u2029', ' ')
+        return json.loads(content)
