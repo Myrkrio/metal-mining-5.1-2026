@@ -1,158 +1,48 @@
 #!/usr/bin/env python3
 """
-Script to clean genres from bands_genres.json.
-- Splits genres separated by "/" into separate items
-- Removes (early)/(mid)/(later) markers and merges all genres
-- Converts genre strings to lists
+CLI script to clean and reduce Metal Archives genres from bands_genres.json.
 """
 
-import json
-import re
 import argparse
 import os
-from pathlib import Path
+import sys
+import json
 
-def _get_project_root():
-    """Get project root directory."""
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Ensure project root is in sys.path when executed directly
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
-
-def clean_genre_string(genre_str: str) -> list:
-    """
-    Clean a genre string and convert it to a list of genres.
-    
-    Examples:
-    - "Heavy/Speed/Power Metal" -> ["Heavy", "Speed", "Power Metal"]
-    - "Death Metal (early); Symphonic Black Metal (mid); Extreme Gothic Metal (later)" 
-      -> ["Death Metal", "Symphonic Black Metal", "Extreme Gothic Metal"]
-    - "Heavy Metal, Hard Rock" -> ["Heavy Metal", "Hard Rock"]
-    """
-    if not genre_str:
-        return []
-    
-    # Step 1: Split by ";" to handle (early)/(mid)/(later) cases
-    parts = [part.strip() for part in genre_str.split(';')]
-    
-    all_genres = []
-    
-    for part in parts:
-        # Step 2: Remove (early)/(mid)/(later) markers
-        part = re.sub(r'\s*\(early\)', '', part, flags=re.IGNORECASE)
-        part = re.sub(r'\s*\(mid\)', '', part, flags=re.IGNORECASE)
-        part = re.sub(r'\s*\(later\)', '', part, flags=re.IGNORECASE)
-        part = re.sub(r'\s*\(early/later\)', '', part, flags=re.IGNORECASE)
-        part = part.strip()
-        
-        if not part:
-            continue
-        
-        # Step 3: Split by "," to separate genres
-        comma_parts = [p.strip() for p in part.split(',')]
-        
-        for comma_part in comma_parts:
-            if not comma_part:
-                continue
-            
-            # Step 4: Split by "/" to separate genres
-            # Simple approach: split by "/" and each part is a genre
-            # e.g., "Heavy/Speed/Power Metal" -> ["Heavy", "Speed", "Power Metal"]
-            # e.g., "Heavy Metal/Hard Rock" -> ["Heavy Metal", "Hard Rock"]
-            slash_parts = [p.strip() for p in comma_part.split('/')]
-            all_genres.extend(slash_parts)
-    
-    # Step 5: Clean up and deduplicate
-    cleaned_genres = []
-    seen = set()
-    
-    for genre in all_genres:
-        genre = genre.strip()
-        if genre and genre.lower() not in seen:
-            cleaned_genres.append(genre)
-            seen.add(genre.lower())
-    
-    return cleaned_genres
+from utils.genres_processing import clean_genres_file
 
 
-def clean_genres_file(input_file: str, output_file: str = None) -> dict:
-    """
-    Clean genres from a JSON file.
-    """
-    input_path = Path(input_file)
-    
-    if not input_path.exists():
-        raise FileNotFoundError(f"Input file not found: {input_file}")
-    
-    # Load the JSON file
-    with open(input_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    
-    cleaned_data = {}
-    
-    for band_name, genre_value in data.items():
-        if genre_value is None:
-            cleaned_data[band_name] = None
-        else:
-            cleaned_genres = clean_genre_string(genre_value)
-            cleaned_data[band_name] = cleaned_genres if cleaned_genres else None
-    
-    # Save to output file
-    if output_file is None:
-        output_file = input_file
-    
-    output_path = Path(output_file)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(cleaned_data, f, indent=2, ensure_ascii=False)
-    
-    return cleaned_data
-
-
-def main():
-    """Main function."""
+def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Clean genres from bands_genres.json"
+        description="Clean and reduce genres from bands_genres.json"
     )
     parser.add_argument(
         "-i", "--input",
-        default=None,
-        help="Input JSON file (default: data/bands_genres.json)"
+        default=os.path.join(PROJECT_ROOT, "data", "bands_genres.json"),
+        help="Input JSON file (default: data/bands_genres.json)",
     )
     parser.add_argument(
         "-o", "--output",
-        default=None,
-        help="Output JSON file (default: overwrites input file)"
+        default=os.path.join(PROJECT_ROOT, "data", "bands_genres_cleaned.json"),
+        help="Output JSON file (default: data/bands_genres_cleaned.json)",
     )
     args = parser.parse_args()
-    
-    if args.input is None:
-        args.input = os.path.join(_get_project_root(), "data", "bands_genres.json")
-    
+
     print(f"Cleaning genres from {args.input}...")
     cleaned_data = clean_genres_file(args.input, args.output)
-    
-    output_file = args.output if args.output else args.input
-    print(f"Cleaned genres saved to {output_file}")
-    
-    # Print some statistics
-    total_bands = len(cleaned_data)
-    bands_with_genres = sum(1 for v in cleaned_data.values() if v is not None)
-    bands_with_multiple_genres = sum(1 for v in cleaned_data.values() if v is not None and len(v) > 1)
-    
-    print(f"\nStatistics:")
-    print(f"  Total bands: {total_bands}")
-    print(f"  Bands with genres: {bands_with_genres}")
-    print(f"  Bands with multiple genres: {bands_with_multiple_genres}")
-    
-    # Show a few examples
-    print(f"\nExample cleaned genres:")
-    count = 0
-    for band, genres in cleaned_data.items():
-        if genres and len(genres) > 1 and count < 5:
-            print(f"  {band}: {genres}")
-            count += 1
+    print(f"Cleaned genres saved to {args.output}")
+
+    with open(args.input, "r", encoding="utf-8") as f:
+        print(f"\nBands before processing: {len(json.load(f))}")
+
+    unique_genres = sorted({g for genres in cleaned_data.values() for g in genres})
+    print(f"\nBands kept: {len(cleaned_data)}")
+    print(f"Unique genres found ({len(unique_genres)}): {unique_genres}")
 
 
 if __name__ == "__main__":
     main()
-
