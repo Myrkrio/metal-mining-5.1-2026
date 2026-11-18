@@ -26,6 +26,10 @@ NON_METAL_GENRES = {
     "a cappella", "experimental", "industrial", "neoclassical", "fusion",
 }
 
+PURE_DESCRIPTORS = {
+    "atmospheric", "blackened", "brutal", "depressive", "epic",
+    "melodic", "raw", "slam", "technical",
+}
 
 def _propagate_metal_suffix(slash_parts: List[str]) -> List[str]:
     """
@@ -86,9 +90,10 @@ def _reduce_genre(raw_genre: str) -> Optional[str]:
     if not re.search(r"[-\s]metal$", genre_lower):
         return None
 
-    # Handle hyphenated roots directly preceding '-Metal' (e.g., Post-Metal, Nu-Metal)
-    if re.fullmatch(r"(post|nu)-metal", genre_lower):
-        return genre.split("-")[0].capitalize()
+    # Handle hyphenated roots directly preceding '-Metal' (e.g., Post-Metal, Progressive Post-Metal, Nu-Metal)
+    hyphen_match = re.search(r"\b(post|nu)-metal$", genre_lower)
+    if hyphen_match:
+        return hyphen_match.group(1).capitalize()
 
     # Strip trailing ' Metal' safely
     without_metal = re.sub(r"\s+metal$", "", genre, flags=re.IGNORECASE).strip()
@@ -99,7 +104,7 @@ def _reduce_genre(raw_genre: str) -> Optional[str]:
     root = without_metal.split()[-1]
     root = re.sub(r"^post-", "", root, flags=re.IGNORECASE)
 
-    if not root or root.lower() == "various":
+    if not root or root.lower() == "various" or root.lower() in PURE_DESCRIPTORS:
         return None
 
     return root.capitalize() if root.islower() else root
