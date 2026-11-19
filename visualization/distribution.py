@@ -1,7 +1,11 @@
 """Visualization functions for dataset distribution analysis."""
 
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from pathlib import Path
+from typing import Dict, List
+import seaborn as sns
 
 
 def analyze_lyrics_distribution(df_songs: pd.DataFrame, df_albums: pd.DataFrame):
@@ -118,3 +122,115 @@ def analyze_lyrics_distribution(df_songs: pd.DataFrame, df_albums: pd.DataFrame)
     plt.show()
     
     return df_songs, df_albums
+
+
+def plot_genres_distribution(
+    genre_counts: Dict[str, int],
+    total_covers: int,
+    output_path: str,
+) -> None:
+    genres = list(genre_counts.keys())
+    counts = list(genre_counts.values())
+
+    fig, ax = plt.subplots(figsize=(12, 10))
+    bars = ax.barh(genres, counts, color="#4C72B0")
+    ax.invert_yaxis()
+
+    max_count = max(counts) if counts else 1
+    ax.set_xlim(0, max_count * 1.18)
+
+    for bar, count in zip(bars, counts):
+        pct = (count / total_covers * 100) if total_covers > 0 else 0.0
+        ax.text(
+            bar.get_width() + max_count * 0.01,
+            bar.get_y() + bar.get_height() / 2,
+            f"{count} ({pct:.1f}%)",
+            va="center",
+            fontsize=9,
+        )
+
+    ax.set_xlabel("Nombre de covers")
+    ax.set_title(f"Distribution des genres sur le dataset ({total_covers} covers)")
+    ax.grid(axis="x", linestyle="--", alpha=0.4)
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+
+
+def plot_genres_per_cover(
+    genres_per_cover: Dict[int, int],
+    total_covers: int,
+    output_path: str,
+) -> None:
+    labels = [str(k) for k in genres_per_cover.keys()]
+    counts = list(genres_per_cover.values())
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    bars = ax.bar(labels, counts, color="#55A868")
+
+    max_count = max(counts) if counts else 1
+    ax.set_ylim(0, max_count * 1.18)
+
+    for bar, count in zip(bars, counts):
+        pct = (count / total_covers * 100) if total_covers > 0 else 0.0
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + max_count * 0.015,
+            f"{count}\n({pct:.1f}%)",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+
+    ax.set_xlabel("Nombre de genres par cover")
+    ax.set_ylabel("Nombre de covers")
+    ax.set_title(f"Répartition multi-label ({total_covers} covers)")
+    ax.grid(axis="y", linestyle="--", alpha=0.4)
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+
+
+def plot_genres_cooccurrence(
+    matrix: List[List[float]],
+    labels: List[str],
+    output_path: str,
+    is_percentage: bool = False,
+) -> None:
+    data = np.array(matrix)
+    mask = np.eye(len(labels), dtype=bool)
+
+    fig, ax = plt.subplots(figsize=(16, 14))
+    sns.heatmap(
+        data,
+        mask=mask,
+        xticklabels=labels,
+        yticklabels=labels,
+        annot=True,
+        fmt=".0f" if is_percentage else "d",
+        annot_kws={"size": 7},
+        cmap="YlGnBu" if is_percentage else "YlOrRd",
+        vmin=0,
+        vmax=100 if is_percentage else None,
+        linewidths=0.3,
+        cbar_kws={"label": "% des covers du genre en ligne" if is_percentage else "Nombre de covers en commun"},
+        ax=ax,
+    )
+
+    title = (
+        "Co-occurrence des genres (% par ligne, diagonale masquée)"
+        if is_percentage
+        else "Co-occurrence des genres (effectifs bruts, diagonale masquée)"
+    )
+    ax.set_title(title, fontsize=13, pad=14)
+    plt.xticks(rotation=45, ha="right", fontsize=9)
+    plt.yticks(rotation=0, fontsize=9)
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)

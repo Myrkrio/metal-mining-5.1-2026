@@ -2,6 +2,7 @@ import json
 import re
 from pathlib import Path
 from typing import Dict, List, Optional
+from collections import Counter
 
 EXACT_MAPPINGS = {
     "nwobhm": "Heavy",
@@ -184,3 +185,56 @@ def clean_genres_file(input_file: str, output_file: str) -> Dict[str, List[str]]
         json.dump(cleaned_data, f, indent=2, ensure_ascii=False)
 
     return cleaned_data
+
+def load_ml_dataset(dataset_path: str) -> List[Dict]:
+    path = Path(dataset_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def compute_genres_stats(dataset: List[Dict]) -> Dict:
+    total_covers = len(dataset)
+    genre_counter: Counter = Counter()
+    genres_per_cover_counter: Counter = Counter()
+
+    for entry in dataset:
+        genres = entry.get("genres") or []
+        genres_per_cover_counter[len(genres)] += 1
+        genre_counter.update(genres)
+
+    sorted_genres = [g for g, _ in genre_counter.most_common()]
+    genre_counts = {g: genre_counter[g] for g in sorted_genres}
+    genres_per_cover = dict(sorted(genres_per_cover_counter.items()))
+
+    index = {g: i for i, g in enumerate(sorted_genres)}
+    n = len(sorted_genres)
+    cooccurrence_counts = [[0] * n for _ in range(n)]
+
+    for entry in dataset:
+        genres = entry.get("genres") or []
+        for g1 in genres:
+            i = index[g1]
+            for g2 in genres:
+                j = index[g2]
+                cooccurrence_counts[i][j] += 1
+
+    cooccurrence_pct = [
+        [
+            (cooccurrence_counts[i][j] / genre_counts[sorted_genres[i]]) * 100.0
+            if genre_counts[sorted_genres[i]] > 0 else 0.0
+            for j in range(n)
+        ]
+        for i in range(n)
+    ]
+
+    return {
+        "total_covers": total_covers,
+        "sorted_genres": sorted_genres,
+        "genre_counts": genre_counts,
+        "genres_per_cover": genres_per_cover,
+        "cooccurrence_counts": cooccurrence_counts,
+        "cooccurrence_pct": cooccurrence_pct,
+    }
