@@ -8,3 +8,6 @@ output_pics/
 *.pyc
 .claude/settings.local.json
 data/covers/
+
+data/bands_genres_cleaned.json
+data/dataset_ml.json
