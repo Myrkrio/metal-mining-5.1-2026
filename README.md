@@ -5,13 +5,14 @@
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-%23F7931E.svg?logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
 [![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?logo=pandas&logoColor=white)](https://pandas.pydata.org/)
 
-Large-scale analysis of heavy metal lyrics using Data Science and Natural Language Processing (NLP) techniques.
+Large-scale analysis of heavy metal music through Natural Language Processing (NLP) on song lyrics and Computer Vision / multi-label classification on album covers.
 
-**Note:** "PAO" is a French acronym for "Projet d'Approfondissement et d'Ouverture" (Deepening and Opening Project), which is a school project at [INSA Rouen Normandie](https://www.insa-rouen.fr/en).
+**Note:** "PAO" is a French acronym for "Projet d'Approfondissement et d'Ouverture" (Deepening and Opening Project), a school project at [INSA Rouen Normandie](https://www.insa-rouen.fr/en).
 
 ## Objective
 
-Examine vocabulary, themes, emotions, and stylistic evolution of metal music through a large and representative corpus of songs.
+- **NLP & Lyrics Analysis (initial project):** Examine vocabulary, themes, emotions, and stylistic evolution of metal music through a large corpus of lyrics.
+- **Album Cover Classification (2026 extension):** Build a clean multi-label dataset of metal album covers (10,645 covers across 22 normalized genres) and train computer vision models to predict musical genres from cover artwork.
 
 ## Project Structure
 
@@ -23,6 +24,7 @@ The project is organized into modular packages:
 - **`metallum_webscraper.py`** : Scraping of musical genres via Metal Archives (Selenium)
 - **`merge_progress_files.py`** : Merging of progress files and automatic language detection
 - **`recalculate_languages.py`** : Language detection recalculation utilities
+- **`dataset_ml.py`** : Matching album covers with artists, merging minority genres (`<= Southern`), and generating `dataset_ml.json`
 
 ### `data_loading/`
 
@@ -51,7 +53,7 @@ The project is organized into modular packages:
 - **`metrics_plots.py`** : General metric visualization functions
 - **`sentiment_plots.py`** : Sentiment analysis visualizations
 - **`wordcloud.py`** : Word cloud generation
-- **`distribution.py`** : Data distribution plots
+- **`distribution.py`** : Genre distribution, multi-label count, and co-occurrence matrix plots
 
 ### `aggregation/`
 
@@ -59,20 +61,22 @@ The project is organized into modular packages:
 
 ### `scripts/`
 
-Main analysis scripts:
+Main analysis and data processing scripts:
 
 - **`metrics_analysis.py`** : Swear words, readability, and "stupidity curve" analysis
 - **`sentiment_analysis.py`** : Sentiment analysis and emotional valence
 - **`metalness_computation.py`** : Metalness metric computation
 - **`metallitude_computation.py`** : Metallitude metric computation
-- **`dataset_distribution.py`** : Dataset statistics and distribution analysis
+- **`dataset_distribution.py`** : Lyrics dataset statistics and distribution analysis
 - **`top_romanian_artists.py`** : Analysis of Romanian metal artists
-- **`clean_genres.py`** : Genre data cleaning utility
+- **`clean_genres.py`** : Genre taxonomy cleaning utility (normalizes raw labels into 32 root genres)
+- **`genres_distribution.py`** : Genre distribution and co-occurrence statistics and plots
 
 ### `utils/`
 
 - **`metalness_loader.py`** : Loading precomputed metalness data
 - **`extract_top_bands.py`** : Utility for extracting top bands from dataset
+- **`genres_processing.py`** : Genre normalization rules and automated co-occurrence-based rare genre merging
 
 ### `resources/`
 
@@ -80,14 +84,21 @@ Main analysis scripts:
 - **`stopwords_eng.txt`** : English stopwords list for text filtering
 - **`vader_lexicon.txt`** : VADER sentiment lexicon
 
-### Data Files
+### Data & Output Files
 
-- **`data/dataset.json`** : Main dataset with lyrics, metadata, and detected language
-- **`data/bands_genres_cleaned.json`** : Musical genres by band
+**Tracked in Git:**
+- **`data/dataset.json`** : Main dataset with lyrics, metadata, and detected language (initial NLP project)
 - **`data/artists_list.json`** : List of artists for scraping
-- **`cache/`** : Cached intermediate data files (hedonometer, lyrics data, etc.)
-- **`output_data/`** : Generated output files (cluster labels, metrics, word rankings)
-- **`output_pics/`** : Generated visualization images
+- **`cache/`** : Cached intermediate data files (hedonometer, non-metal lyrics)
+- **`outputs/genres/`** : Final genre distribution and co-occurrence plots (`genres_distribution.png`, `genres_per_cover.png`, `genres_cooccurrence_pct.png`)
+- **`output_data/`** : Generated NLP output files (cluster labels, metrics, word rankings)
+- **`output_pics/`** : Generated NLP visualization images
+
+**Local only (ignored by `.gitignore` due to Git LFS storage limits):**
+- **`data/bands_genres.json`** : Raw musical genres by band from Metal Archives (8,860 bands — shared offline within the team)
+- **`data/covers/`** : Album cover images directory (shared offline within the team)
+- **`data/bands_genres_cleaned.json`** : Normalized genres (32 root genres, generated locally)
+- **`data/dataset_ml.json`** : Final multi-label image dataset (10,645 covers across 22 genres, generated locally)
 
 ## Installation
 
@@ -99,7 +110,24 @@ pip install -r requirements.txt
 
 ## Usage
 
-Main analysis scripts are located in the `scripts/` directory. Run them from the project root:
+### 1. Local Dataset Generation (Album Cover Classification)
+
+After placing `data/bands_genres.json` and `data/covers/` in the `data/` directory, generate the cleaned genre mappings and ML dataset locally:
+
+```bash
+# 1. Normalize raw genres into 32 root genres
+python ./scripts/clean_genres.py
+
+# 2. Match covers with artists and merge rare genres (<= Southern) into 22 final classes
+python ./data_collection/dataset_ml.py
+
+# 3. (Optional) Regenerate genre distribution and co-occurrence plots in outputs/genres/
+python ./scripts/genres_distribution.py
+```
+
+### 2. NLP Lyrics Analysis Scripts
+
+Run the lyrics analysis scripts from the project root:
 
 ```bash
 # Metrics analysis (swear words, readability)
@@ -117,7 +145,7 @@ python scripts/metallitude_computation.py
 
 Most scripts support command-line arguments for customizing input paths and parameters. Use `--help` for detailed options.
 
-## Main Metrics
+## Main Metrics (NLP)
 
 1. **Swear word ratio** : Proportion of profane words
 2. **Coleman–Liau Readability Index** : Text complexity
@@ -132,11 +160,12 @@ Most scripts support command-line arguments for customizing input paths and para
 
 ## Detailed Documentation
 
-For complete details on methodology, results, visualizations, and conclusions, see **[REPORT.md](REPORT.md)**.
+For complete details on the initial NLP methodology, results, visualizations, and conclusions, see **[REPORT.md](REPORT.md)**.
 
 ## Credits
 
-Rayen, Mathis, Nizar, and Florent
+- **Album Cover Classification & Genre Taxonomy (2026):** Nathan Levasseur & Yohann Guenegou
+- **Initial NLP & Lyrics Analysis (2025):** Rayen, Mathis, Nizar, and Florent
 
 ## Sources
 
