@@ -1,3 +1,5 @@
+from pyexpat import model
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -80,9 +82,9 @@ def train_model():
     print("\nDemarrage de l'entrainement multi-label...")
     for epoch in range(epochs):
         if epoch == unfreeze_epoch:
-            unfreeze_layers(model, architecture=architecture, level=2)
+            unfreeze_layers(model, architecture=architecture, level=3)  # Degel complet du backbone
             # Level 2 : On peut ajuster le taux d'apprentissage pour le degel partiel
-            optimizer = build_optimizer(model, lr=1e-5)
+            optimizer = build_optimizer(model, lr=5e-6)
 
         model.train()
         train_loss = 0.0
@@ -91,9 +93,9 @@ def train_model():
             images, targets = images.to(device), targets.to(device).float()
 
             optimizer.zero_grad()
-            logits = model(images)
-
-            loss = criterion(logits, targets)
+            with torch.amp.autocast("cuda", dtype=torch.bfloat16):
+                logits = model(images)
+                loss = criterion(logits, targets)
             loss.backward()
             optimizer.step()
 
@@ -110,12 +112,12 @@ def train_model():
         with torch.no_grad():
             for images, targets in val_loader:
                 images, targets = images.to(device), targets.to(device).float()
-                logits = model(images)
-
-                loss = criterion(logits, targets)
+                with torch.amp.autocast("cuda", dtype=torch.bfloat16):
+                    logits = model(images)
+                    loss = criterion(logits, targets)
                 val_loss += loss.item() * images.size(0)
 
-                preds = torch.sigmoid(logits).cpu().numpy()
+                preds = torch.sigmoid(logits.float()).cpu().numpy()
                 val_preds.append(preds)
                 val_targets.append(targets.cpu().numpy())
 
@@ -137,7 +139,7 @@ def train_model():
         if epoch_val_auc > best_val_auc:
             best_val_auc = epoch_val_auc
             patience_counter = 0
-            torch.save(model.state_dict(), "best_model.pth")
+            torch.save(model.state_dict(), "./results/best_model.pth")
             print("Sauvegarde du meilleur modele (best_model.pth) suite a une amelioration de l'AUC-ROC.")
         else:
             patience_counter += 1
